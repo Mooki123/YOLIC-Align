@@ -5,6 +5,7 @@ import itertools
 
 import cv2
 from torchvision.models import mobilenet_v2
+from yolic_align import add_arch_argument, load_model
 from sklearn.metrics import confusion_matrix
 from sklearn import metrics
 import random
@@ -35,6 +36,7 @@ parser.add_argument('--log-interval', type=int, default=25, metavar='N',
 parser.add_argument('--resume', type=bool, default=True, metavar='N',
                     help='resume from the last weights')
 torch.cuda.empty_cache()
+add_arch_argument(parser, inference=True)
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 torch.manual_seed(args.seed)
@@ -72,9 +74,7 @@ polygonList = [[0, 0, 151, 0, 52, 54, 0, 54], [151, 0, 254, 0, 191, 54, 52, 54],
                 209, 821, 210, 826, 211, 831, 212, 835, 213, 840, 214, 845, 215, 848, 216, 848, 338, 645, 338],
                [0, 338, 203, 338, 137, 480, 0, 480], [203, 338, 424, 338, 424, 480, 137, 480],
                [645, 338, 424, 338, 424, 480, 711, 480], [848, 338, 645, 338, 711, 480, 848, 480]]
-model = mobilenet_v2()  # load the model
-model.classifier[1] = nn.Linear(1280, NumCell * (NumClass + 1))
-model.load_state_dict(torch.load("./weights/mobilenet_indoor.pth.tar"))
+model = load_model(args, 'indoor', NumCell, NumClass + 1, "./weights/mobilenet_indoor.pth.tar")
 
 save_name = 'mobilenet_indoor'  # name of the model
 class_names = ["Sofa", "Wall", "Pillar", "People", "Door", "Others", "Road", "Background"]

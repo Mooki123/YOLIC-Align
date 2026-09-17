@@ -8,6 +8,7 @@ import torch
 from torchvision import transforms
 import torch.nn as nn
 from torchvision.models import mobilenet_v2
+from yolic_align import add_arch_argument, load_model
 from cityscapes import Cityscapes
 from sklearn.metrics import confusion_matrix
 from sklearn import metrics
@@ -24,6 +25,7 @@ parser.add_argument('--log-interval', type=int, default=25, metavar='N',
 parser.add_argument('--resume', type=bool, default=True, metavar='N',
                     help='resume from the last weights')
 torch.cuda.empty_cache()
+add_arch_argument(parser, inference=True)
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 torch.manual_seed(args.seed)
@@ -109,14 +111,11 @@ interested_classes = [(11, 12), (13, 14, 15, 16, 17, 18),
 NumCell = 256  # number of cells
 NumClass = 3  # number of classes except background class
 root = 'Datasets/Cityscapes'
-model = mobilenet_v2()  # load the model
-model.classifier[1] = nn.Linear(1280, NumCell * (NumClass + 1))
+model = load_model(args, 'cityscapes', NumCell, NumClass + 1, "./weights/mobilenet_cityscapes_new300.pth.tar")
 save_name = 'Cityscapes'  # name of the model
-train_weights = torch.load("./weights/mobilenet_cityscapes_new300.pth.tar")
 title_name = 'Confusion Matrix'
 class_names = ["People", "Vehicle", "Other", "Road", "Background"]
 binary_class_names = ["Risk", "Road"]
-model.load_state_dict(train_weights)
 val_test_trans = transforms.Compose(([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),  # divides by 255
