@@ -16,8 +16,7 @@ import os.path
 import pandas as pd
 import os
 from torchvision.models import mobilenet_v2, MobileNet_V2_Weights
-import cv2
-import torch.nn.functional as F
+from yolic_align import add_arch_argument, build_model, checkpoint_path
 
 parser = argparse.ArgumentParser(description='PyTorch Training Script')
 parser.add_argument('--batch_size', type=int, default=32, metavar='N',
@@ -38,87 +37,7 @@ parser.add_argument('--resume', type=bool, default=True, metavar='N',
 NumCell = 30  # number of cells
 NumClass = 6  # number of classes
 save_name = 'mobilenet_indoor'  # name of the model
-polygonList = [[0, 0, 151, 0, 52, 54, 0, 54], [151, 0, 254, 0, 191, 54, 52, 54], [254, 0, 359, 0, 334, 54, 191, 54],
-               [359, 0, 424, 0, 424, 54, 334, 54], [489, 0, 424, 0, 424, 54, 514, 54],
-               [594, 0, 489, 0, 514, 54, 657, 54], [697, 0, 594, 0, 657, 54, 796, 54],
-               [848, 0, 697, 0, 796, 54, 848, 54], [0, 54, 52, 54, 0, 82], [52, 54, 191, 54, 133, 102, 0, 102, 0, 82],
-               [191, 54, 334, 54, 312, 102, 133, 102], [334, 54, 424, 54, 424, 102, 312, 102],
-               [514, 54, 424, 54, 424, 102, 536, 102], [657, 54, 514, 54, 536, 102, 715, 102],
-               [796, 54, 657, 54, 715, 102, 848, 102, 848, 82], [848, 54, 796, 54, 848, 82], [0, 102, 133, 102, 0, 212],
-               [133, 102, 312, 102, 277, 178, 266, 179, 255, 180, 244, 181, 234, 182, 223, 183, 213, 184, 203, 185, 193,
-                186, 183, 187, 173, 188, 163, 189, 153, 190, 145, 191, 137, 192, 129, 193, 121, 194, 113, 195, 106, 196,
-                99, 197, 93, 198, 86, 199, 80, 200, 74, 201, 68, 202, 62, 203, 57, 204, 51, 205, 46, 206, 41, 207, 36,
-                208, 31, 209, 27, 210, 22, 211, 17, 212, 13, 213, 8, 214, 3, 215, 0, 216, 0, 212],
-               [312, 102, 424, 102, 424, 178, 277, 178], [536, 102, 424, 102, 424, 178, 571, 178],
-               [715, 102, 536, 102, 571, 178, 582, 179, 593, 180, 604, 181, 614, 182, 625, 183, 635, 184, 645, 185, 655,
-                186, 665, 187, 675, 188, 685, 189, 695, 190, 703, 191, 711, 192, 719, 193, 727, 194, 735, 195, 742, 196,
-                749, 197, 755, 198, 762, 199, 768, 200, 774, 201, 780, 202, 786, 203, 791, 204, 797, 205, 802, 206, 807,
-                207, 812, 208, 817, 209, 821, 210, 826, 211, 831, 212, 835, 213, 840, 214, 845, 215, 848, 216, 848,
-                212], [848, 102, 715, 102, 848, 212],
-               [277, 178, 266, 179, 255, 180, 244, 181, 234, 182, 223, 183, 213, 184, 203, 185, 193, 186, 183, 187, 173,
-                188, 163, 189, 153, 190, 145, 191, 137, 192, 129, 193, 121, 194, 113, 195, 106, 196, 99, 197, 93, 198,
-                86, 199, 80, 200, 74, 201, 68, 202, 62, 203, 57, 204, 51, 205, 46, 206, 41, 207, 36, 208, 31, 209, 27,
-                210, 22, 211, 17, 212, 13, 213, 8, 214, 3, 215, 0, 216, 0, 338, 203, 338],
-               [277, 178, 424, 178, 424, 338, 203, 338], [571, 178, 424, 178, 424, 338, 645, 338],
-               [571, 178, 582, 179, 593, 180, 604, 181, 614, 182, 625, 183, 635, 184, 645, 185, 655, 186, 665, 187, 675,
-                188, 685, 189, 695, 190, 703, 191, 711, 192, 719, 193, 727, 194, 735, 195, 742, 196, 749, 197, 755, 198,
-                762, 199, 768, 200, 774, 201, 780, 202, 786, 203, 791, 204, 797, 205, 802, 206, 807, 207, 812, 208, 817,
-                209, 821, 210, 826, 211, 831, 212, 835, 213, 840, 214, 845, 215, 848, 216, 848, 338, 645, 338],
-               [0, 338, 203, 338, 137, 480, 0, 480], [203, 338, 424, 338, 424, 480, 137, 480],
-               [645, 338, 424, 338, 424, 480, 711, 480], [848, 338, 645, 338, 711, 480, 848, 480]]
-
-def generate_fractional_masks(polygon_list, original_size=(848, 480), input_size=(224, 224), feature_size=(7, 7)):
-    masks = []
-    scale_x = input_size[0] / original_size[0]
-    scale_y = input_size[1] / original_size[1]
-    
-    for poly in polygon_list:
-        pts = np.array(poly).reshape(-1, 2)
-        scaled_pts = np.zeros_like(pts, dtype=np.float32)
-        scaled_pts[:, 0] = pts[:, 0] * scale_x
-        scaled_pts[:, 1] = pts[:, 1] * scale_y
-        scaled_pts = np.int32(scaled_pts)
-        
-        mask = np.zeros((input_size[1], input_size[0]), dtype=np.float32)
-        cv2.fillPoly(mask, [scaled_pts], 1.0)
-        masks.append(mask)
-        
-    mask_tensor = torch.tensor(np.stack(masks))
-    mask_tensor = mask_tensor.unsqueeze(0)
-    mask_features = F.adaptive_avg_pool2d(mask_tensor, feature_size)
-    mask_features = mask_features.squeeze(0)
-    return mask_features
-
-class YolicAlignModel(nn.Module):
-    def __init__(self, pretrained=True):
-        super(YolicAlignModel, self).__init__()
-        weights = MobileNet_V2_Weights.DEFAULT if pretrained else None
-        base_model = mobilenet_v2(weights=weights)
-        self.features = base_model.features
-        
-        self.classifier = nn.Linear(1280, NumClass + 1)
-        self.register_buffer('fractional_masks', generate_fractional_masks(polygonList))
-        
-    def forward(self, x):
-        feat = self.features(x)
-        B = feat.shape[0]
-        
-        feat_expanded = feat.unsqueeze(2) 
-        masks_expanded = self.fractional_masks.unsqueeze(0).unsqueeze(0)
-        
-        masked_feat = feat_expanded * masks_expanded
-        pooled = masked_feat.sum(dim=(3, 4))
-        
-        mask_area = masks_expanded.sum(dim=(3, 4))
-        pooled = pooled / (mask_area + 1e-6)
-        
-        pooled = pooled.transpose(1, 2)
-        logits = self.classifier(pooled)
-        logits = logits.reshape(B, -1)
-        return logits
-
-model = YolicAlignModel(pretrained=True)
-optimizer = optim.Adam(model.parameters(), lr=0.001)  # optimizer and learning rate
+add_arch_argument(parser)
 torch.cuda.empty_cache()
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
@@ -127,10 +46,14 @@ torch.manual_seed(args.seed)
 if args.cuda:
     torch.cuda.manual_seed(args.seed)
 
+save_name = checkpoint_path(save_name, args.arch)
+model = build_model(args.arch, 'indoor', NumCell, NumClass + 1, pretrained=True)
+optimizer = optim.Adam(model.parameters(), lr=0.001)  # optimizer and learning rate
+
 
 def random_augmentation(image, label_list, seq_list):
     # flip image horizontally
-    image = image.flip(1)
+    image = image.flip(2)  # C x H x W tensor: dim 2 is width
     n_groups = len(seq_list)
     n_labels = len(label_list)
     assert n_labels % n_groups == 0  # make sure it's evenly divisible

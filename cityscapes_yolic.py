@@ -13,8 +13,7 @@ import pandas as pd
 import os
 from torchvision.models import mobilenet_v2, MobileNet_V2_Weights
 from cityscapes import Cityscapes
-import cv2
-import torch.nn.functional as F
+from yolic_align import add_arch_argument, build_model, checkpoint_path
 
 parser = argparse.ArgumentParser(description='PyTorch Training Script')
 parser.add_argument('--batch_size', type=int, default=32, metavar='N',
@@ -110,59 +109,7 @@ interested_classes = [(11, 12), (13, 14, 15, 16, 17, 18),
                       (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 25, 21, 20, 19), (0, 23, 22, 24)]
 
 save_name = 'cityscapes_mobilenet'  # name of the model
-def generate_fractional_masks(cell_list, original_size=(2048, 1024), input_size=(224, 224), feature_size=(7, 7)):
-    import numpy as np
-    
-    masks = []
-    scale_x = input_size[0] / original_size[0]
-    scale_y = input_size[1] / original_size[1]
-    
-    for cell in cell_list:
-        x1 = int(cell[0][0] * scale_x)
-        y1 = int(cell[0][1] * scale_y)
-        x2 = int(cell[1][0] * scale_x)
-        y2 = int(cell[1][1] * scale_y)
-        
-        mask = np.zeros((input_size[1], input_size[0]), dtype=np.float32)
-        cv2.rectangle(mask, (x1, y1), (x2, y2), 1.0, -1)
-        masks.append(mask)
-        
-    mask_tensor = torch.tensor(np.stack(masks))
-    mask_tensor = mask_tensor.unsqueeze(0)
-    mask_features = F.adaptive_avg_pool2d(mask_tensor, feature_size)
-    mask_features = mask_features.squeeze(0)
-    return mask_features
-
-class YolicAlignModel(nn.Module):
-    def __init__(self, pretrained=True):
-        super(YolicAlignModel, self).__init__()
-        weights = MobileNet_V2_Weights.DEFAULT if pretrained else None
-        base_model = mobilenet_v2(weights=weights)
-        self.features = base_model.features
-        
-        self.classifier = nn.Linear(1280, NumClass + 1)
-        self.register_buffer('fractional_masks', generate_fractional_masks(cell_list, original_size=(2048, 1024)))
-        
-    def forward(self, x):
-        feat = self.features(x)
-        B = feat.shape[0]
-        
-        feat_expanded = feat.unsqueeze(2) 
-        masks_expanded = self.fractional_masks.unsqueeze(0).unsqueeze(0)
-        
-        masked_feat = feat_expanded * masks_expanded
-        pooled = masked_feat.sum(dim=(3, 4))
-        
-        mask_area = masks_expanded.sum(dim=(3, 4))
-        pooled = pooled / (mask_area + 1e-6)
-        
-        pooled = pooled.transpose(1, 2)
-        logits = self.classifier(pooled)
-        logits = logits.reshape(B, -1)
-        return logits
-
-model = YolicAlignModel(pretrained=True)
-optimizer = optim.Adam(model.parameters(), lr=0.001)  # optimizer and learning rate
+add_arch_argument(parser)
 torch.cuda.empty_cache()
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
@@ -170,6 +117,10 @@ args.cuda = not args.no_cuda and torch.cuda.is_available()
 torch.manual_seed(args.seed)
 if args.cuda:
     torch.cuda.manual_seed(args.seed)
+
+save_name = checkpoint_path(save_name, args.arch)
+model = build_model(args.arch, 'cityscapes', NumCell, NumClass + 1, pretrained=True)
+optimizer = optim.Adam(model.parameters(), lr=0.001)  # optimizer and learning rate
 
 train_trans = transforms.Compose(([
 

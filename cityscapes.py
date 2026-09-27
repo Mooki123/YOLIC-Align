@@ -159,7 +159,7 @@ class Cityscapes(data.Dataset):
             if random.random() > 0.5:
                 new_width = 2198
                 new_height = 1099
-                image = image.resize((new_width, new_height), Image.ANTIALIAS)
+                image = image.resize((new_width, new_height), Image.LANCZOS)
                 target = target.resize((new_width, new_height), Image.NEAREST)
                 crop_width, crop_height = 2048, 1024
                 left = random.randint(0, new_width - crop_width)

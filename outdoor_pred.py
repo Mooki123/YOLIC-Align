@@ -5,6 +5,7 @@ import itertools
 
 import cv2
 from torchvision.models import mobilenet_v2
+from yolic_align import add_arch_argument, load_model
 from sklearn.metrics import confusion_matrix
 from sklearn import metrics
 import random
@@ -35,6 +36,7 @@ parser.add_argument('--log-interval', type=int, default=25, metavar='N',
 parser.add_argument('--resume', type=bool, default=True, metavar='N',
                     help='resume from the last weights')
 torch.cuda.empty_cache()
+add_arch_argument(parser, inference=True)
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 torch.manual_seed(args.seed)
@@ -43,9 +45,7 @@ if args.cuda:
 
 NumCell = 104  # number of cells
 NumClass = 11  # number of classes except background class
-model = mobilenet_v2()  # load the model
-model.classifier[1] = nn.Linear(1280, NumCell * (NumClass + 1))
-model.load_state_dict(torch.load("./weights/mobilenet_outdoor.pth.tar"))
+model = load_model(args, 'outdoor', NumCell, NumClass + 1, "./weights/mobilenet_outdoor.pth.tar")
 save_name = 'Outdoor_mobilenet'  # name of the model
 points_list = [(288, 166), (322, 166), (356, 166), (390, 166), (424, 166), (458, 166), (492, 166), (526, 166),
                (220, 200), (254, 200), (288, 200), (322, 200), (356, 200), (390, 200), (424, 200), (458, 200),
@@ -120,7 +120,7 @@ color_box = [(10, 249, 72), (151, 157, 255), (134, 219, 61), (52, 147, 26), (29,
          (23, 204, 146), (56, 56, 255), (187, 212, 0), (168, 153, 44)]
 def random_augmentation(image, label_list, seq_list):
     # flip image horizontally
-    image = image.flip(1)
+    image = image.flip(2)  # C x H x W tensor: dim 2 is width
     n_groups = len(seq_list)
     n_labels = len(label_list)
     assert n_labels % n_groups == 0  # make sure it's evenly divisible

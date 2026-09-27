@@ -3,6 +3,7 @@
 
 import itertools
 from torchvision.models import mobilenet_v2
+from yolic_align import add_arch_argument, load_model
 from sklearn.metrics import confusion_matrix
 from sklearn import metrics
 import random
@@ -33,6 +34,7 @@ parser.add_argument('--log-interval', type=int, default=25, metavar='N',
 parser.add_argument('--resume', type=bool, default=True, metavar='N',
                     help='resume from the last weights')
 torch.cuda.empty_cache()
+add_arch_argument(parser, inference=True)
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 torch.manual_seed(args.seed)
@@ -41,20 +43,18 @@ if args.cuda:
 
 NumCell = 30  # number of cells
 NumClass = 6  # number of classes except background class
-model = mobilenet_v2()  # load the model
-model.classifier[1] = nn.Linear(1280, NumCell * (NumClass + 1))
+model = load_model(args, 'indoor', NumCell, NumClass + 1, "./mobilenet_indoor.pth.tar")
 save_name = 'Indoor'  # name of the model
 title_name = 'Confusion Matrix'
 class_names = ["Sofa", "Wall", "Pillar", "People", "Door", "Others", "Road", "Background"]
 binary_class_names = ["Risk", "Road"]
-model.load_state_dict(torch.load("model.pth.tar"))
 val_test_trans = transforms.Compose(([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),  # divides by 255
 ]))
 
 def random_augmentation(image, label_list, seq_list):
-    image = image.flip(1)
+    image = image.flip(2)  # C x H x W tensor: dim 2 is width
     n_groups = len(seq_list)
     n_labels = len(label_list)
     assert n_labels % n_groups == 0  # make sure it's evenly divisible

@@ -3,6 +3,7 @@
 
 import itertools
 from torchvision.models import mobilenet_v2
+from yolic_align import add_arch_argument, load_model
 from sklearn.metrics import confusion_matrix
 from sklearn import metrics
 import random
@@ -33,6 +34,7 @@ parser.add_argument('--log-interval', type=int, default=25, metavar='N',
 parser.add_argument('--resume', type=bool, default=True, metavar='N',
                     help='resume from the last weights')
 torch.cuda.empty_cache()
+add_arch_argument(parser, inference=True)
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 torch.manual_seed(args.seed)
@@ -48,9 +50,7 @@ NumClass = 11  # number of classes except background class
 # torch.ao.quantization.prepare_qat(model.train(), inplace=True)
 # train_weights = torch.load("shufflenet_qat_outdoor204.pth.tar")
 # model.load_state_dict(train_weights)
-model = mobilenet_v2()  # load the model
-model.classifier[1] = nn.Linear(1280, NumCell * (NumClass + 1))
-model.load_state_dict(torch.load("./mobilenet_outdoor_weight.pth.tar"))
+model = load_model(args, 'outdoor', NumCell, NumClass + 1, "./mobilenet_outdoor.pth.tar")
 # from torchvision import models
 # model = models.shufflenet_v2_x1_0()
 # model.fc = nn.Linear(1024, NumCell * (NumClass + 1))
@@ -69,7 +69,7 @@ val_test_trans = transforms.Compose(([
 
 def random_augmentation(image, label_list, seq_list):
     # flip image horizontally
-    image = image.flip(1)
+    image = image.flip(2)  # C x H x W tensor: dim 2 is width
     n_groups = len(seq_list)
     n_labels = len(label_list)
     assert n_labels % n_groups == 0  # make sure it's evenly divisible
@@ -126,8 +126,8 @@ class MultiLabelRGBataSet(torch.utils.data.Dataset):
                 label = torch.tensor(label, dtype=torch.float32)
         return img, label
 
-img_dir = r'C:\Users\Kai\Desktop\Datasets\data_noflip\RGB'
-label_dir = r'C:\Users\Kai\Desktop\Datasets\data_noflip\yoliclabel'
+img_dir = 'images'
+label_dir = 'yoliclabel'
 img_list = os.listdir(img_dir)
 train_img, Val_Test = train_test_split(img_list, test_size=0.3, random_state=2)
 val_img, test_img = train_test_split(Val_Test, test_size=0.6666, random_state=2)

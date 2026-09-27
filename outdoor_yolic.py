@@ -26,7 +26,7 @@ from torch.cuda.amp import autocast as autocast
 from torch.cuda.amp import GradScaler as GradScaler
 from torchvision.models import mobilenet_v2, MobileNet_V2_Weights, ShuffleNet_V2_X1_0_Weights
 
-from shufflenet import shufflenet_v2_x1_0
+from yolic_align import add_arch_argument, build_model, checkpoint_path
 
 parser = argparse.ArgumentParser(description='PyTorch Training Script')
 parser.add_argument('--batch_size', type=int, default=32, metavar='N',
@@ -48,128 +48,7 @@ NumCell = 104  # number of cells
 NumClass = 11  # number of classes
 save_name = 'mobilenet_outdoor'  # name of the model
 
-points_list = [(288, 166), (322, 166), (356, 166), (390, 166), (424, 166), (458, 166), (492, 166), (526, 166),
-               (220, 200), (254, 200), (288, 200), (322, 200), (356, 200), (390, 200), (424, 200), (458, 200),
-               (492, 200), (526, 200), (560, 200), (594, 200),
-               (220, 234), (254, 234), (288, 234), (322, 234), (356, 234), (390, 234), (424, 234), (458, 234),
-               (492, 234), (526, 234), (560, 234), (594, 234), (628, 234),
-               (254, 268), (288, 268), (322, 268), (356, 268), (390, 268), (424, 268), (458, 268), (492, 268),
-               (526, 268), (560, 268), (594, 268), (628, 268),
-               (0, 268), (53, 268), (106, 268), (159, 268), (212, 268), (265, 268), (318, 268), (371, 268), (424, 268),
-               (477, 268), (530, 268), (583, 268), (636, 268), (689, 268), (742, 268), (795, 268),
-               (0, 321), (53, 321), (106, 321), (159, 321), (212, 321), (265, 321), (318, 321), (371, 321), (424, 321),
-               (477, 321), (530, 321), (583, 321), (636, 321), (689, 321), (742, 321), (795, 321), (848, 321),
-               (0, 374), (53, 374), (106, 374), (159, 374), (212, 374), (265, 374), (318, 374), (371, 374), (424, 374),
-               (477, 374), (530, 374), (583, 374), (636, 374), (689, 374), (742, 374), (795, 374), (848, 374),
-               (0, 427), (53, 427), (106, 427), (159, 427), (212, 427), (265, 427), (318, 427), (371, 427), (424, 427),
-               (477, 427), (530, 427), (583, 427), (636, 427), (689, 427), (742, 427), (795, 427), (848, 427),
-               (0, 480), (53, 480), (106, 480), (159, 480), (212, 480), (265, 480), (318, 480), (371, 480), (424, 480),
-               (477, 480), (530, 480), (583, 480), (636, 480), (689, 480), (742, 480), (795, 480), (848, 480),
-               (184, 0), (244, 0), (304, 0), (364, 0), (424, 0), (484, 0), (544, 0), (604, 0), (244, 60), (304, 60),
-               (364, 60), (424, 60), (484, 60), (544, 60), (604, 60), (664, 60)]
-cell_list = [[points_list[0], points_list[11]], [points_list[1], points_list[12]], [points_list[2], points_list[13]],
-            [points_list[3], points_list[14]], [points_list[4], points_list[15]],
-            [points_list[5], points_list[16]], [points_list[6], points_list[17]], [points_list[7], points_list[18]],
-            [points_list[8], points_list[21]], [points_list[9], points_list[22]],
-            [points_list[10], points_list[23]], [points_list[11], points_list[24]], [points_list[12], points_list[25]],
-            [points_list[13], points_list[26]], [points_list[14], points_list[27]],
-            [points_list[15], points_list[28]], [points_list[16], points_list[29]], [points_list[17], points_list[30]],
-            [points_list[18], points_list[31]], [points_list[19], points_list[32]],
-            [points_list[20], points_list[33]], [points_list[21], points_list[34]], [points_list[22], points_list[35]],
-            [points_list[23], points_list[36]], [points_list[24], points_list[37]],
-            [points_list[25], points_list[38]], [points_list[26], points_list[39]], [points_list[27], points_list[40]],
-            [points_list[28], points_list[41]], [points_list[29], points_list[42]],
-            [points_list[30], points_list[43]], [points_list[31], points_list[44]], [points_list[45], points_list[62]],
-            [points_list[46], points_list[63]], [points_list[47], points_list[64]],
-            [points_list[48], points_list[65]], [points_list[49], points_list[66]], [points_list[50], points_list[67]],
-            [points_list[51], points_list[68]], [points_list[52], points_list[69]],
-            [points_list[53], points_list[70]], [points_list[54], points_list[71]], [points_list[55], points_list[72]],
-            [points_list[56], points_list[73]], [points_list[57], points_list[74]],
-            [points_list[58], points_list[75]], [points_list[59], points_list[76]], [points_list[60], points_list[77]],
-            [points_list[61], points_list[79]], [points_list[62], points_list[80]],
-            [points_list[63], points_list[81]], [points_list[64], points_list[82]], [points_list[65], points_list[83]],
-            [points_list[66], points_list[84]], [points_list[67], points_list[85]],
-            [points_list[68], points_list[86]], [points_list[69], points_list[87]], [points_list[70], points_list[88]],
-            [points_list[71], points_list[89]], [points_list[72], points_list[90]],
-            [points_list[73], points_list[91]], [points_list[74], points_list[92]], [points_list[75], points_list[93]],
-            [points_list[76], points_list[94]], [points_list[78], points_list[96]],
-            [points_list[79], points_list[97]], [points_list[80], points_list[98]], [points_list[81], points_list[99]],
-            [points_list[82], points_list[100]], [points_list[83], points_list[101]],
-            [points_list[84], points_list[102]], [points_list[85], points_list[103]],
-            [points_list[86], points_list[104]], [points_list[87], points_list[105]],
-            [points_list[88], points_list[106]],
-            [points_list[89], points_list[107]], [points_list[90], points_list[108]],
-            [points_list[91], points_list[109]], [points_list[92], points_list[110]],
-            [points_list[93], points_list[111]],
-            [points_list[95], points_list[113]], [points_list[96], points_list[114]],
-            [points_list[97], points_list[115]], [points_list[98], points_list[116]],
-            [points_list[99], points_list[117]],
-            [points_list[100], points_list[118]], [points_list[101], points_list[119]],
-            [points_list[102], points_list[120]], [points_list[103], points_list[121]],
-            [points_list[104], points_list[122]],
-            [points_list[105], points_list[123]], [points_list[106], points_list[124]],
-            [points_list[107], points_list[125]], [points_list[108], points_list[126]],
-            [points_list[109], points_list[127]],
-            [points_list[110], points_list[128]], [points_list[129], points_list[137]],
-            [points_list[130], points_list[138]], [points_list[131], points_list[139]],
-            [points_list[132], points_list[140]],
-            [points_list[133], points_list[141]], [points_list[134], points_list[142]],
-            [points_list[135], points_list[143]], [points_list[136], points_list[144]]]
-
-def generate_fractional_masks(cell_list, original_size=(848, 480), input_size=(224, 224), feature_size=(7, 7)):
-    import cv2
-    import numpy as np
-    
-    masks = []
-    scale_x = input_size[0] / original_size[0]
-    scale_y = input_size[1] / original_size[1]
-    
-    for cell in cell_list:
-        x1 = int(cell[0][0] * scale_x)
-        y1 = int(cell[0][1] * scale_y)
-        x2 = int(cell[1][0] * scale_x)
-        y2 = int(cell[1][1] * scale_y)
-        
-        mask = np.zeros((input_size[1], input_size[0]), dtype=np.float32)
-        cv2.rectangle(mask, (x1, y1), (x2, y2), 1.0, -1)
-        masks.append(mask)
-        
-    mask_tensor = torch.tensor(np.stack(masks))
-    mask_tensor = mask_tensor.unsqueeze(0)
-    mask_features = F.adaptive_avg_pool2d(mask_tensor, feature_size)
-    mask_features = mask_features.squeeze(0)
-    return mask_features
-
-class YolicAlignModel(nn.Module):
-    def __init__(self, pretrained=True):
-        super(YolicAlignModel, self).__init__()
-        weights = MobileNet_V2_Weights.DEFAULT if pretrained else None
-        base_model = mobilenet_v2(weights=weights)
-        self.features = base_model.features
-        
-        self.classifier = nn.Linear(1280, NumClass + 1)
-        self.register_buffer('fractional_masks', generate_fractional_masks(cell_list, original_size=(848, 480)))
-        
-    def forward(self, x):
-        feat = self.features(x)
-        B = feat.shape[0]
-        
-        feat_expanded = feat.unsqueeze(2) 
-        masks_expanded = self.fractional_masks.unsqueeze(0).unsqueeze(0)
-        
-        masked_feat = feat_expanded * masks_expanded
-        pooled = masked_feat.sum(dim=(3, 4))
-        
-        mask_area = masks_expanded.sum(dim=(3, 4))
-        pooled = pooled / (mask_area + 1e-6)
-        
-        pooled = pooled.transpose(1, 2)
-        logits = self.classifier(pooled)
-        logits = logits.reshape(B, -1)
-        return logits
-
-model = YolicAlignModel(pretrained=True)
-optimizer = optim.Adam(model.parameters(), lr=0.001)  # optimizer and learning rate
+add_arch_argument(parser)
 torch.cuda.empty_cache()
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
@@ -178,10 +57,14 @@ torch.manual_seed(args.seed)
 if args.cuda:
     torch.cuda.manual_seed(args.seed)
 
+save_name = checkpoint_path(save_name, args.arch)
+model = build_model(args.arch, 'outdoor', NumCell, NumClass + 1, pretrained=True)
+optimizer = optim.Adam(model.parameters(), lr=0.001)  # optimizer and learning rate
+
 
 def random_augmentation(image, label_list, seq_list):
     # flip image horizontally
-    image = image.flip(1)
+    image = image.flip(2)  # C x H x W tensor: dim 2 is width
     n_groups = len(seq_list)
     n_labels = len(label_list)
     assert n_labels % n_groups == 0  # make sure it's evenly divisible
@@ -206,7 +89,8 @@ def random_augmentation(image, label_list, seq_list):
 
 
 class MultiLabelRGBataSet(torch.utils.data.Dataset):
-    def __init__(self, imgspath, imgslist, annotationpath, transforms=None):
+    def __init__(self, imgspath, imgslist, annotationpath, transforms=None, train=0):
+        self.train = train
         self.imgslist = imgslist
         self.imgspath = imgspath
         self.transform = transforms
@@ -225,7 +109,7 @@ class MultiLabelRGBataSet(torch.utils.data.Dataset):
         filename = os.path.basename(filename)
         annotation = os.path.join(self.annotationpath, filename + ".txt")
         label = np.loadtxt(annotation, dtype=np.int64)
-        if random.random() > 0.5:
+        if self.train == 1 and random.random() > 0.5:
             img, label = random_augmentation(img, label, [7, 6, 5, 4, 3, 2, 1, 0, 19, 18, 17, 16, 15, 14, 13, 12, 11,
                                                           10, 9, 8, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 47,
                                                           46, 45, 44, 43, 42, 41, 40, 39, 38, 37, 36, 35, 34, 33, 32,
@@ -254,7 +138,7 @@ img_list = os.listdir(img_dir)
 train_img, Val_Test = train_test_split(img_list, test_size=0.3, random_state=2)
 val_img, test_img = train_test_split(Val_Test, test_size=0.6666, random_state=2)
 
-train = MultiLabelRGBataSet(img_dir, train_img, label_dir, train_trans)
+train = MultiLabelRGBataSet(img_dir, train_img, label_dir, train_trans, train=1)
 valid = MultiLabelRGBataSet(img_dir, val_img, label_dir, val_test_trans)
 test = MultiLabelRGBataSet(img_dir, test_img, label_dir, val_test_trans)
 

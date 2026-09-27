@@ -10,6 +10,7 @@ import torch
 from torch import nn
 from torchvision import transforms
 from torchvision.models import mobilenet_v2
+from yolic_align import add_arch_argument, load_model
 from cityscapes2 import Cityscapes
 
 parser = argparse.ArgumentParser(description='PyTorch Training Script')
@@ -19,6 +20,7 @@ parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
 
 torch.cuda.empty_cache()
+add_arch_argument(parser, inference=True)
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 torch.manual_seed(args.seed)
@@ -105,9 +107,7 @@ NumCell = 256  # number of cells
 NumClass = 3  # number of classes except background class
 root = "Datasets/Cityscapes"
 save_name = 'Cityscapes_mobilenet'  # name of the model
-model = mobilenet_v2()  # load the model
-model.classifier[1] = nn.Linear(1280, NumCell * (NumClass + 1))
-model.load_state_dict(torch.load('Models/' + save_name + '.pth'))  # load the model
+model = load_model(args, 'cityscapes', NumCell, NumClass + 1, 'Models/' + save_name + '.pth')  # load the model
 
 class_names = ["People", "Vehicle", "Other", "Road", "Background"]
 color_box = [(31, 112, 255), (151, 157, 255), (56, 56, 255)]
