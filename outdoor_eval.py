@@ -126,8 +126,8 @@ class MultiLabelRGBataSet(torch.utils.data.Dataset):
                 label = torch.tensor(label, dtype=torch.float32)
         return img, label
 
-img_dir = r'C:\Users\Kai\Desktop\Datasets\data_noflip\RGB'
-label_dir = r'C:\Users\Kai\Desktop\Datasets\data_noflip\yoliclabel'
+img_dir = 'images'
+label_dir = 'yoliclabel'
 img_list = os.listdir(img_dir)
 train_img, Val_Test = train_test_split(img_list, test_size=0.3, random_state=2)
 val_img, test_img = train_test_split(Val_Test, test_size=0.6666, random_state=2)

@@ -26,7 +26,6 @@ from torch.cuda.amp import autocast as autocast
 from torch.cuda.amp import GradScaler as GradScaler
 from torchvision.models import mobilenet_v2, MobileNet_V2_Weights, ShuffleNet_V2_X1_0_Weights
 
-from shufflenet import shufflenet_v2_x1_0
 from yolic_align import add_arch_argument, build_model, checkpoint_path
 
 parser = argparse.ArgumentParser(description='PyTorch Training Script')
@@ -90,7 +89,8 @@ def random_augmentation(image, label_list, seq_list):
 
 
 class MultiLabelRGBataSet(torch.utils.data.Dataset):
-    def __init__(self, imgspath, imgslist, annotationpath, transforms=None):
+    def __init__(self, imgspath, imgslist, annotationpath, transforms=None, train=0):
+        self.train = train
         self.imgslist = imgslist
         self.imgspath = imgspath
         self.transform = transforms
@@ -109,7 +109,7 @@ class MultiLabelRGBataSet(torch.utils.data.Dataset):
         filename = os.path.basename(filename)
         annotation = os.path.join(self.annotationpath, filename + ".txt")
         label = np.loadtxt(annotation, dtype=np.int64)
-        if random.random() > 0.5:
+        if self.train == 1 and random.random() > 0.5:
             img, label = random_augmentation(img, label, [7, 6, 5, 4, 3, 2, 1, 0, 19, 18, 17, 16, 15, 14, 13, 12, 11,
                                                           10, 9, 8, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 47,
                                                           46, 45, 44, 43, 42, 41, 40, 39, 38, 37, 36, 35, 34, 33, 32,
@@ -138,7 +138,7 @@ img_list = os.listdir(img_dir)
 train_img, Val_Test = train_test_split(img_list, test_size=0.3, random_state=2)
 val_img, test_img = train_test_split(Val_Test, test_size=0.6666, random_state=2)
 
-train = MultiLabelRGBataSet(img_dir, train_img, label_dir, train_trans)
+train = MultiLabelRGBataSet(img_dir, train_img, label_dir, train_trans, train=1)
 valid = MultiLabelRGBataSet(img_dir, val_img, label_dir, val_test_trans)
 test = MultiLabelRGBataSet(img_dir, test_img, label_dir, val_test_trans)
 
